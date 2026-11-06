@@ -1,6 +1,9 @@
+import { createHash } from "node:crypto"
 import { Plugin } from "@opencode/plugin"
 import { Awake, type AwakeOptions } from "./awake.ts"
+import { Caffeinate, LidSleep } from "./power.ts"
 import { AwakeRpc } from "./rpc.ts"
+import { SessionTracker } from "./tracker.ts"
 
 const ID = "opencode-awake"
 const RECONNECT_DELAY = 1_000
@@ -10,10 +13,16 @@ interface Shared {
   refs: number
 }
 
-// The plugin loads once per location, but power assertions are system-wide, so every
-// instance from this module shares one tracker. This lives in the module rather than on
-// globalThis so that a reloaded module starts fresh instead of reusing stale code.
-let current: Shared | undefined
+// The plugin loads once per location, and each location can get its own copy of this
+// module, but power assertions are system-wide. Every copy shares one tracker through
+// globalThis, keyed by a hash of the code, so a hot reload with changed code starts a
+// fresh tracker instead of reusing stale code. The old one is released with its plugins.
+const VERSION = createHash("sha256")
+  .update([Awake, Caffeinate, LidSleep, SessionTracker].map(String).join("\n"))
+  .digest("hex")
+  .slice(0, 16)
+const KEY = Symbol.for(`${ID}.shared.${VERSION}`)
+const globals = globalThis as { [KEY]?: Shared }
 
 function log(message: string) {
   console.log(`[${ID}] ${message}`)
@@ -40,7 +49,7 @@ export default Plugin.define({
       return
     }
 
-    const shared = (current ??= {
+    const shared = (globals[KEY] ??= {
       awake: new Awake(options(ctx.options as Record<string, unknown>), log, {
         get: async () => (await ctx.storage.get("lidSleepDisabled")) === true,
         set: (value) => ctx.storage.set("lidSleepDisabled", value),
@@ -51,7 +60,7 @@ export default Plugin.define({
 
     const release = async () => {
       if (--shared.refs > 0) return
-      if (current === shared) current = undefined
+      if (globals[KEY] === shared) delete globals[KEY]
       await shared.awake.dispose()
     }
 
