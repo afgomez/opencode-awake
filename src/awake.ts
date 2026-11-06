@@ -1,4 +1,5 @@
 import { Caffeinate, LidSleep, type Log } from "./power.ts"
+import type { AwakeState } from "./rpc.ts"
 import { SessionTracker, type SessionEvent } from "./tracker.ts"
 
 export interface AwakeOptions {
@@ -31,6 +32,8 @@ export class Awake {
   private graceTimer: ReturnType<typeof setTimeout> | undefined
   private readonly pruneTimer: ReturnType<typeof setInterval>
   private awake = false
+  private current: AwakeState = "idle"
+  private readonly listeners = new Set<(state: AwakeState) => void>()
 
   constructor(
     private readonly options: AwakeOptions,
@@ -42,6 +45,16 @@ export class Awake {
     this.pruneTimer = setInterval(() => this.prune(), PRUNE_INTERVAL)
     this.pruneTimer.unref?.()
     void this.recover()
+  }
+
+  get state() {
+    return this.current
+  }
+
+  /** Calls `listener` whenever the state changes. Returns an unsubscribe function. */
+  subscribe(listener: (state: AwakeState) => void) {
+    this.listeners.add(listener)
+    return () => void this.listeners.delete(listener)
   }
 
   handle(event: SessionEvent) {
@@ -80,7 +93,10 @@ export class Awake {
     this.awake = true
     this.log(`keeping awake: ${this.tracker.ids().join(", ")}`)
     this.caffeinate.hold()
-    void this.disableLidSleep().catch(this.fail)
+    this.notify()
+    void this.disableLidSleep()
+      .catch(this.fail)
+      .finally(() => this.notify())
   }
 
   private async sleep() {
@@ -88,7 +104,15 @@ export class Awake {
     this.awake = false
     this.log("no running sessions, allowing sleep")
     this.caffeinate.release()
+    this.notify()
     await this.restoreLidSleep().catch(this.fail)
+  }
+
+  private notify() {
+    const state: AwakeState = !this.awake ? "idle" : this.lid?.effective ? "lid" : "awake"
+    if (state === this.current) return
+    this.current = state
+    for (const listener of this.listeners) listener(state)
   }
 
   private async disableLidSleep() {

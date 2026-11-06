@@ -54,20 +54,29 @@ export class Caffeinate {
  */
 export class LidSleep {
   private owned = false
+  private external = false
   private watchdog: ChildProcess | undefined
   private queue: Promise<unknown> = Promise.resolve()
   private warned = false
 
   constructor(private readonly log: Log) {}
 
+  /** Whether this instance disabled sleep and must restore it. */
   get active() {
     return this.owned
+  }
+
+  /** Whether sleep is disabled, by this instance or by someone else. */
+  get effective() {
+    return this.owned || this.external
   }
 
   enable() {
     return this.serial(async () => {
       if (this.owned) return
-      if (await sleepDisabled()) return // Someone else disabled sleep; leave it to them.
+      // Someone else disabled sleep; leave it to them.
+      this.external = await sleepDisabled()
+      if (this.external) return
       try {
         await pmset("1")
       } catch (error) {
@@ -95,6 +104,7 @@ export class LidSleep {
 
   disable() {
     return this.serial(async () => {
+      this.external = false
       if (!this.owned) return
       this.watchdog?.kill()
       this.watchdog = undefined

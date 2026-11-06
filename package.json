@@ -4,9 +4,14 @@
   "description": "Keeps macOS awake while any OpenCode session is running",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./tui": "./src/tui.tsx",
+    "./rpc": "./src/rpc.ts"
   },
-  "files": ["src", "README.md"],
+  "files": [
+    "src",
+    "README.md"
+  ],
   "scripts": {
     "test": "bun test",
     "typecheck": "tsc --noEmit"
@@ -14,8 +19,16 @@
   "dependencies": {
     "@opencode/plugin": "2.2.5"
   },
+  "peerDependencies": {
+    "@opentui/core": ">=0.8.0",
+    "@opentui/solid": ">=0.8.0",
+    "solid-js": ">=1.9.0"
+  },
   "devDependencies": {
+    "@opentui/core": "0.8.0",
+    "@opentui/solid": "0.8.0",
     "@types/bun": "^1.3.0",
+    "solid-js": "1.9.17",
     "typescript": "^5.9.0"
   },
   "repository": {
@@ -26,5 +39,10 @@
   "bugs": {
     "url": "https://github.com/afgomez/opencode-awake/issues"
   },
-  "keywords": ["opencode", "opencode-plugin", "caffeinate", "macos"]
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "caffeinate",
+    "macos"
+  ]
 }

@@ -13,6 +13,16 @@ While at least one session is running:
 
 After the last session finishes, the plugin waits `graceMs` and then releases both. If a session sends no events for `staleMs`, the plugin assumes its end event was missed and stops counting it.
 
+## Status icon
+
+The TUI shows an icon under the prompt. It is the first item on the right side of the footer, before subagents, shells, and context usage:
+
+- 󰅶 (`nf-md-coffee`): the Mac stays awake even with the lid closed.
+- 󰶞 (`nf-md-tea`): the Mac stays awake with the lid open, but closing the lid may still put it to sleep.
+- No icon: no session is running, so the Mac can sleep.
+
+The icons need a [Nerd Font](https://www.nerdfonts.com/). The server part publishes its state through the `opencode-awake` RPC, which other clients can read too (`opencode-awake/rpc`).
+
 ## Install
 
 ```jsonc

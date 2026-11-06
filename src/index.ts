@@ -1,8 +1,8 @@
 import { Plugin } from "@opencode/plugin"
 import { Awake, type AwakeOptions } from "./awake.ts"
+import { AwakeRpc } from "./rpc.ts"
 
 const ID = "opencode-awake"
-const SHARED = Symbol.for(`${ID}.shared`)
 const RECONNECT_DELAY = 1_000
 
 interface Shared {
@@ -10,7 +10,10 @@ interface Shared {
   refs: number
 }
 
-const globals = globalThis as { [SHARED]?: Shared }
+// The plugin loads once per location, but power assertions are system-wide, so every
+// instance from this module shares one tracker. This lives in the module rather than on
+// globalThis so that a reloaded module starts fresh instead of reusing stale code.
+let current: Shared | undefined
 
 function log(message: string) {
   console.log(`[${ID}] ${message}`)
@@ -31,13 +34,13 @@ function options(raw: Record<string, unknown>): AwakeOptions {
 
 export default Plugin.define({
   id: ID,
-  setup(ctx) {
+  async setup(ctx) {
     if (process.platform !== "darwin") {
       log(`unsupported platform ${process.platform}, doing nothing`)
       return
     }
 
-    const shared = (globals[SHARED] ??= {
+    const shared = (current ??= {
       awake: new Awake(options(ctx.options as Record<string, unknown>), log, {
         get: async () => (await ctx.storage.get("lidSleepDisabled")) === true,
         set: (value) => ctx.storage.set("lidSleepDisabled", value),
@@ -45,6 +48,24 @@ export default Plugin.define({
       refs: 0,
     })
     shared.refs++
+
+    const release = async () => {
+      if (--shared.refs > 0) return
+      if (current === shared) current = undefined
+      await shared.awake.dispose()
+    }
+
+    const rpc = await ctx.rpc
+      .register(AwakeRpc, {
+        state: async () => ({ state: shared.awake.state }),
+      })
+      .catch(async (error) => {
+        await release()
+        throw error
+      })
+    const unsubscribe = shared.awake.subscribe((state) => {
+      rpc.events.emit("changed", { state }).catch((error) => log(`cannot publish state: ${error}`))
+    })
 
     const controller = new AbortController()
     void (async () => {
@@ -63,9 +84,9 @@ export default Plugin.define({
 
     return async () => {
       controller.abort()
-      if (--shared.refs > 0) return
-      if (globals[SHARED] === shared) delete globals[SHARED]
-      await shared.awake.dispose()
+      unsubscribe()
+      await rpc.dispose()
+      await release()
     }
   },
 })
