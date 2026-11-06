@@ -18,5 +18,13 @@
     "@types/bun": "^1.3.0",
     "typescript": "^5.9.0"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/afgomez/opencode-awake.git"
+  },
+  "homepage": "https://github.com/afgomez/opencode-awake#readme",
+  "bugs": {
+    "url": "https://github.com/afgomez/opencode-awake/issues"
+  },
   "keywords": ["opencode", "opencode-plugin", "caffeinate", "macos"]
 }
