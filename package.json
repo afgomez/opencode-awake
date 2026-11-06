@@ -1,0 +1,22 @@
+{
+  "name": "opencode-awake",
+  "version": "0.1.0",
+  "description": "Keeps macOS awake while any OpenCode session is running",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": ["src", "README.md"],
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@opencode/plugin": "2.2.5"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.0",
+    "typescript": "^5.9.0"
+  },
+  "keywords": ["opencode", "opencode-plugin", "caffeinate", "macos"]
+}
